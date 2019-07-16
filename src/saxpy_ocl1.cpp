@@ -85,7 +85,7 @@ int main(int argc, const char *argv[])
       std::cout << "Using " << default_device.getInfo<CL_DEVICE_VENDOR>() << " "
                 << default_device.getInfo<CL_DEVICE_NAME>() << std::endl;
 
-      cl::Context context({default_device});
+      cl::Context context(default_device);
       cl::Program::Sources sources;
       std::string kernel_code =
             "__kernel void saxpy(float alpha,"
