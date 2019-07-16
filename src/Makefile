@@ -18,7 +18,7 @@
 CC = g++
 CC_O = -o
 #CFLAGS = -O3 -std=c++11
-CFLAGS = -std=c++11 -Ofast -march=native -mtune=native -funroll-loops -mfpmath=both
+CFLAGS = -std=c++11 -Ofast -march=native -mtune=native -funroll-loops
 EXE =
 RM = rm -f
 
@@ -57,29 +57,16 @@ CUDA_LDFLAGS =
 #
 # Bulk
 #
-BULK_CFLAGS = -I/home/bennylp/Desktop/opt/src/bulk
+BULK_CFLAGS = ""
 
-#
-# OpenCL settings
-#
+OCL_CFLAGS = -I.. -DCL_HPP_ENABLE_EXCEPTIONS=1
 
-# Typical settings for MacOS:
-#
-#OCL_CFLAGS =
-#OCL_LDFLAGS = -framework OpenCL
-
-# Sample settings for Windows:
-#
-# With OpenCL From CUDA SDK
-#OCL_CFLAGS = /I"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\include"
-#OCL_LDFLAGS = /link /LIBPATH:"C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v8.0\lib\x64" OpenCL.lib
-
-# With Intel OpenCL
-#OCL_CFLAGS = /I"$(INTELOCLSDKROOT)/include"
-#OCL_LDFLAGS = /link /LIBPATH:"$(INTELOCLSDKROOT)/lib/x64" OpenCL.lib
-
-OCL_CFLAGS = -I/home/bennylp/Desktop/opt/include -DCL_HPP_ENABLE_EXCEPTIONS=1
-OCL_LDFLAGS = -L/home/bennylp/Desktop/opt/lib -lOpenCL -lstdc++
+OS=$(shell uname)
+ifeq ($(OS), Darwin)
+	OCL_LDFLAGS = -framework OpenCL -lstdc++
+else
+	OCL_LDFLAGS = -lOpenCL -lstdc++
+endif
 
 #
 # OpenMP settings
