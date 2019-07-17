@@ -82,12 +82,17 @@ static cl::Device select_device(const std::string &where) {
 
 int main(int argc, const char *argv[]) {
   try {
+    // Search for available devices and select the first of the available type
+    // (either CPU or GPU, depending on the command line argument)
     cl::Device default_device = select_device(argc > 1 ? argv[1] : "");
     std::cout << "Using " << default_device.getInfo<CL_DEVICE_VENDOR>() << " "
               << default_device.getInfo<CL_DEVICE_NAME>() << std::endl;
 
+    // OpenCL boilerplate code
     cl::Context context(default_device);
     cl::Program::Sources sources;
+
+    // The OpenCL kernel code (i.e. the code that will be executed on the GPU)
     std::string kernel_code = "__kernel void saxpy(float alpha,"
                               "                    __global const float* X,"
                               "                    __global float* Y)"
@@ -97,42 +102,55 @@ int main(int argc, const char *argv[]) {
                               "}";
     sources.push_back({kernel_code.c_str(), kernel_code.length()});
 
+    // Compile the GPU code
     cl::Program program(context, sources);
     program.build({default_device});
 
+    // Allocate GPU memory buffers
     cl::Buffer dev_x(context, CL_MEM_READ_ONLY, N * sizeof(float));
     cl::Buffer dev_y(context, CL_MEM_READ_WRITE, N * sizeof(float));
 
+    // Initialize arrays on the host (CPU)
     float *host_x = new float[N], *host_y = new float[N];
     for (size_t i = 0; i < N; ++i) {
       host_x[i] = XVAL;
       host_y[i] = YVAL;
     }
 
+    // Write the initialized CPU arrays to the allocated GPU buffers
     cl::CommandQueue queue(context, default_device);
     queue.enqueueWriteBuffer(dev_x, CL_TRUE, 0, N * sizeof(float), host_x);
     queue.enqueueWriteBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y);
 
+    // Create a callable object that represents the GPU kernel 
     cl::Kernel kernel(program, "saxpy");
-    saxpy_timer timer;
 
-#if 0 // Nicer but only available on newer OpenCL (cl2.hpp?)
-      cl::KernelFunctor saxpy( kernel, queue, cl::NullRange, cl::NDRange(N), cl::NullRange);
-      saxpy(AVAL, dev_x, dev_y);
-#else
+    // The buffers we created can now be used as function arguments for the GPU
+    // kernel program
     kernel.setArg(0, (float)AVAL);
     kernel.setArg(1, dev_x);
     kernel.setArg(2, dev_y);
 
+    // A wall clock timer (starts the timer upon construction)
+    saxpy_timer timer;
+
+    // Invoke the kernel
     queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N));
+    
+    // Wait for the GPU to finish with execution
     queue.finish();
-#endif
+
+    // Measure how much time elapsed since the timer started
     double elapsed = timer.elapsed_msec();
     std::cout << "Elapsed: " << elapsed << " ms\n";
 
+    // Read out the result (Y)
     queue.enqueueReadBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y);
+
+    // Veryify the correctness
     saxpy_verify(host_y);
 
+    // Clean up the heap
     delete[] host_x;
     delete[] host_y;
 
