@@ -1,79 +1,11 @@
-#include "saxpy.h"
 #include <iostream>
 #include <vector>
 
+#include "saxpy.h"
+#include "saxpy_ocl1_helper.h"
+
 #define __CL_ENABLE_EXCEPTIONS
 #include "extra/cl.hpp"
-
-// For some docs:
-// - http://github.khronos.org/OpenCL-CLHPP/
-// -
-// http://simpleopencl.blogspot.co.id/2013/06/tutorial-simple-start-with-opencl-and-c.html
-
-
-static std::string dev_type_name(unsigned dev_type) {
-  std::string ret;
-  if (dev_type & CL_DEVICE_TYPE_CPU)
-    ret += "cpu ";
-  if (dev_type & CL_DEVICE_TYPE_GPU)
-    ret += "gpu ";
-  if (dev_type & CL_DEVICE_TYPE_ACCELERATOR)
-    ret += "accel ";
-  if (dev_type & CL_DEVICE_TYPE_CUSTOM)
-    ret += "custom ";
-  return ret;
-}
-
-// Eumerate and select device: "cpu", "gpu", or ""
-static cl::Device select_device(const std::string &where) {
-  std::vector<cl::Platform> platforms;
-  cl::Platform::get(&platforms);
-  if (platforms.empty())
-    throw cl::Error(-1, "No platforms found");
-
-  cl::Device selected_dev;
-
-  for (auto &plat : platforms) {
-    std::cout << "Platform \"" << plat.getInfo<CL_PLATFORM_NAME>()
-              << "\". Devices:\n";
-
-    std::vector<cl::Device> devices;
-    plat.getDevices(CL_DEVICE_TYPE_ALL, &devices);
-    if (devices.size() == 0) {
-      std::cout << "  No devices found.\n";
-      continue;
-    }
-
-    for (auto &dev : devices) {
-      auto dev_type = dev.getInfo<CL_DEVICE_TYPE>();
-      std::cout << " - [" << dev_type_name(dev_type) << "] "
-                << dev.getInfo<CL_DEVICE_VENDOR>() << ": "
-                << dev.getInfo<CL_DEVICE_NAME>() << std::endl;
-      std::cout << "   (Max compute units: "
-                << dev.getInfo<CL_DEVICE_MAX_COMPUTE_UNITS>()
-                << ", max work group size: "
-                << dev.getInfo<CL_DEVICE_MAX_WORK_GROUP_SIZE>() << ")\n";
-
-      if (selected_dev())
-        continue;
-
-      if (where == "cpu" && dev_type == CL_DEVICE_TYPE_CPU) {
-        selected_dev = dev;
-      } else if (where == "gpu" && dev_type == CL_DEVICE_TYPE_GPU) {
-        selected_dev = dev;
-      }
-    }
-    std::cout << std::endl;
-  }
-
-  if (where.empty())
-    selected_dev = cl::Device::getDefault();
-
-  if (!selected_dev())
-    throw cl::Error(-1, "Device not found");
-
-  return selected_dev;
-}
 
 int main(int argc, const char *argv[]) {
   try {
@@ -113,7 +45,7 @@ int main(int argc, const char *argv[]) {
     }
 
     // Write the initialized CPU arrays to the allocated GPU buffers
-    cl::CommandQueue queue(context, default_device);
+    cl::CommandQueue queue(context, default_device, CL_QUEUE_PROFILING_ENABLE);
     queue.enqueueWriteBuffer(dev_x, CL_TRUE, 0, N * sizeof(float), host_x.data());
     queue.enqueueWriteBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y.data());
 
@@ -129,15 +61,28 @@ int main(int argc, const char *argv[]) {
     // A wall clock timer (starts the timer upon construction)
     saxpy_timer timer;
 
-    // Invoke the kernel
-    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N));
-    
-    // Wait for the GPU to finish with execution
-    queue.finish();
+    // An OpenCL Event: useful for getting profiling information from OpenCL calls
+    cl::Event evt;
 
-    // Measure how much time elapsed since the timer started
-    double elapsed = timer.elapsed_msec();
-    std::cout << "Elapsed: " << elapsed << " ms\n";
+    // Invoke the kernel. This is an "non-blocking" call. This means that the
+    // CPU can go on with doing whatever it likes, because this workload is
+    // running on the GPU!
+    queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(N), cl::NullRange, NULL, &evt);
+
+    // Wait for the GPU to finish execution
+    evt.wait();
+
+    // Get the profiling data from the Event object
+    cl_ulong time_start, time_end;
+    evt.getProfilingInfo(CL_PROFILING_COMMAND_START, &time_start);
+    evt.getProfilingInfo(CL_PROFILING_COMMAND_END, &time_end);
+
+    // Print out the kernel execution time
+    double kernel_time = (time_end - time_start) / 1000000.0;
+    printf("GPU execution time is: %0.3f ms \n", kernel_time);
+    
+    // This forces the CPU to wait for the GPU to finish with execution
+    queue.finish();
 
     // Read out the result (Y)
     queue.enqueueReadBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y.data());
