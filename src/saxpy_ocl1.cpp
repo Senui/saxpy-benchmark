@@ -1,20 +1,15 @@
 #include "saxpy.h"
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <iostream>
+#include <vector>
+
+#define __CL_ENABLE_EXCEPTIONS
+#include "extra/cl.hpp"
 
 // For some docs:
 // - http://github.khronos.org/OpenCL-CLHPP/
 // -
 // http://simpleopencl.blogspot.co.id/2013/06/tutorial-simple-start-with-opencl-and-c.html
 
-#define __CL_ENABLE_EXCEPTIONS
-//#define CL_HPP_TARGET_OPENCL_VERSION 120
-//#define CL_VERSION_1_2
-//#include <CL/cl.hpp>		// <-- On Error, use the "extra/cl.hpp" instead
-//#define CL_VERSION_2_0
-//#include <CL/cl2.hpp>		// <-- On Error, use the "extra/cl.hpp" instead
-#include "extra/cl.hpp"
 
 static std::string dev_type_name(unsigned dev_type) {
   std::string ret;
@@ -111,7 +106,7 @@ int main(int argc, const char *argv[]) {
     cl::Buffer dev_y(context, CL_MEM_READ_WRITE, N * sizeof(float));
 
     // Initialize arrays on the host (CPU)
-    float *host_x = new float[N], *host_y = new float[N];
+    std::vector<float> host_x(N), host_y(N);
     for (size_t i = 0; i < N; ++i) {
       host_x[i] = XVAL;
       host_y[i] = YVAL;
@@ -119,8 +114,8 @@ int main(int argc, const char *argv[]) {
 
     // Write the initialized CPU arrays to the allocated GPU buffers
     cl::CommandQueue queue(context, default_device);
-    queue.enqueueWriteBuffer(dev_x, CL_TRUE, 0, N * sizeof(float), host_x);
-    queue.enqueueWriteBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y);
+    queue.enqueueWriteBuffer(dev_x, CL_TRUE, 0, N * sizeof(float), host_x.data());
+    queue.enqueueWriteBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y.data());
 
     // Create a callable object that represents the GPU kernel 
     cl::Kernel kernel(program, "saxpy");
@@ -145,15 +140,10 @@ int main(int argc, const char *argv[]) {
     std::cout << "Elapsed: " << elapsed << " ms\n";
 
     // Read out the result (Y)
-    queue.enqueueReadBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y);
+    queue.enqueueReadBuffer(dev_y, CL_TRUE, 0, N * sizeof(float), host_y.data());
 
-    // Veryify the correctness
+    // Verify the correctness
     saxpy_verify(host_y);
-
-    // Clean up the heap
-    delete[] host_x;
-    delete[] host_y;
-
   } catch (cl::Error err) {
     std::cerr << "ERROR: " << err.what() << "(code: " << err.err() << ")\n";
   }
