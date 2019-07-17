@@ -16,7 +16,7 @@ int main(void)
    }
 
    double elapsed = t.elapsed_msec();
-   std::cout << "Elapsed: " << elapsed << " ms" << std::endl;
+   std::cout << "CPU execution time = " << elapsed << " ms" << std::endl;
    saxpy_verify(y);
 
    delete[] x;

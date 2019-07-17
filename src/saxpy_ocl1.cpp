@@ -79,7 +79,7 @@ int main(int argc, const char *argv[]) {
 
     // Print out the kernel execution time
     double kernel_time = (time_end - time_start) / 1000000.0;
-    printf("GPU execution time is: %0.3f ms \n", kernel_time);
+    printf("GPU execution time = %0.3f ms \n", kernel_time);
     
     // This forces the CPU to wait for the GPU to finish with execution
     queue.finish();
