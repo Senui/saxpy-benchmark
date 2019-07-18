@@ -22,7 +22,7 @@ TARGETS = saxpy_cpu \
 ###################################################################
 
 ## OpenCL settings
-OCL_CFLAGS = -I.. -DCL_HPP_ENABLE_EXCEPTIONS=1 -Wno-deprecated-declarations
+OCL_CFLAGS = -I.. -DCL_HPP_ENABLE_EXCEPTIONS=1 -Wno-deprecated-declarations -I/tutorial/OpenCL-Headers
 OS=$(shell uname)
 ifeq ($(OS), Darwin)
 	OCL_LDFLAGS = -framework OpenCL
